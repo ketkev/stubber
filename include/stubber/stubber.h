@@ -97,9 +97,9 @@ class stubber {
     typedef std::map<std::string, argument> t_argument_map;
     typedef std::pair<std::string, argument> t_name_argument;
 
-    function_call(std::string const & name,
-        std::initializer_list<t_name_argument> const & arguments) :
-        m_name(name), m_arguments(t_argument_map()) {
+    function_call(std::string const & name, std::initializer_list<t_name_argument> const & arguments)
+      :  m_name(name), m_arguments(t_argument_map())
+    {
       for (auto const & item : arguments) {
         m_arguments.insert(item);
       }
@@ -158,27 +158,25 @@ class stubber {
     return &s_stub;
   }
 
-  static void reset() {
-    s_stub.m_function_calls.clear();
-    s_stub.m_function_results.clear();
+  void reset() {
+    m_function_calls.clear();
+    m_function_results.clear();
   }
 
-  static void register_call(std::string const & name,
-      std::initializer_list<function_call::t_name_argument> const & arguments)
-  {
-    s_stub.m_function_calls.push_back(function_call(name, arguments));
-  }
-
-  template <class T>
-  static void register_function_result(std::string const & function_name, T result) {
-    s_stub.m_function_results[function_name] = (any_abstract*)new any<T>(result);
+  void register_call(std::string const & name, std::initializer_list<function_call::t_name_argument> const & arguments) {
+    m_function_calls.push_back(function_call(name, arguments));
   }
 
   template <class T>
-  static T get_result(std::string const & function_name) {
+  void register_function_result(std::string const & function_name, T result) {
+    m_function_results[function_name] = (any_abstract*)new any<T>(result);
+  }
+
+  template <class T>
+  T get_result(std::string const & function_name) {
     T result;
     try {
-      any_abstract* something = s_stub.m_function_results.at(function_name);
+      any_abstract* something = m_function_results.at(function_name);
       result = *(reinterpret_cast<T*>(something->get_value()));
     } catch (std::out_of_range const & e) {
       throw std::runtime_error("No result defined for '" + function_name + "(..)'");
