@@ -143,10 +143,12 @@ class stubber {
   };
   typedef std::list<function_call> t_function_call_list;
   typedef std::map<std::string, any_abstract*> t_function_results;
+  typedef std::map<std::string, std::map<std::string, any_abstract*> > t_function_parameter_returns;
 
   stubber() :
     m_function_calls(t_function_call_list()),
-    m_function_results(t_function_results())
+    m_function_results(t_function_results()),
+    m_function_parameter_returns(t_function_parameter_returns())
   {
   }
   ~stubber() = default;
@@ -161,6 +163,7 @@ class stubber {
   void reset() {
     m_function_calls.clear();
     m_function_results.clear();
+    m_function_parameter_returns.clear();
   }
 
   void register_call(std::string const & name, std::initializer_list<function_call::t_name_argument> const & arguments) {
@@ -170,6 +173,11 @@ class stubber {
   template <class T>
   void register_function_result(std::string const & function_name, T result) {
     m_function_results[function_name] = (any_abstract*)new any<T>(result);
+  }
+
+  template <class T>
+  void register_function_parameter_return(std::string const & function_name, std::string const & parameter_name, T value) {
+    m_function_parameter_returns[function_name][parameter_name] = (any_abstract*)new any<T>(value);
   }
 
   template <class T>
@@ -184,6 +192,19 @@ class stubber {
     return result;
   }
 
+  template <class T>
+  T get_function_parameter_return(std::string const & function_name, std::string const & parameter_name) {
+    T result;
+    try {
+      auto parameters = m_function_parameter_returns.at(function_name);
+      auto value = parameters.at(parameter_name);
+      result = *(reinterpret_cast<T*>(value->get_value()));
+    } catch (std::out_of_range const & e) {
+      throw std::runtime_error("No result defined for '" + function_name + "(..)', parameter: '" + parameter_name + "'");
+    }
+    return result;
+  }
+
   t_function_call_list const & function_calls() const {
     return m_function_calls;
   }
@@ -194,6 +215,7 @@ class stubber {
 
   t_function_call_list m_function_calls;
   t_function_results m_function_results;
+  t_function_parameter_returns m_function_parameter_returns;
 };
 
 typedef stubber::function_call::argument t_arg;
