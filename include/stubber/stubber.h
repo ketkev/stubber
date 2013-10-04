@@ -20,6 +20,7 @@
 #include <sstream>
 #include <ostream>
 #include <stdexcept>
+#include <string>
 
 #include <iostream>
 
@@ -141,9 +142,47 @@ class stubber {
     std::string m_name;
     t_argument_map m_arguments;
   };
+
+
+  class condition {
+    public:
+
+
+    explicit condition() : m_condition("NONE") {};
+    template <class T>
+    explicit condition(T const& conditional_value) {
+      std::ostringstream oss;
+      oss << conditional_value;
+      m_condition = oss.str();
+    }
+    template <class T, class S>
+    explicit condition(T const& conditional_value_1, S const& conditional_value_2) {
+      std::ostringstream oss;
+      oss << conditional_value_1 << ", " << conditional_value_2;
+      m_condition = oss.str();
+    }
+    template <class T, class S, class R>
+    explicit condition(T const& conditional_value_1, S const& conditional_value_2, R const& conditional_value_3) {
+      std::ostringstream oss;
+      oss << conditional_value_1 << ", " << conditional_value_2 << ", " << conditional_value_3;
+      m_condition = oss.str();
+    }
+
+
+    std::string value() { return m_condition; }
+    std::string const& value() const { return m_condition; }
+
+
+    protected:
+
+
+    std::string m_condition;
+  };
+
+
   typedef std::list<function_call> t_function_call_list;
-  typedef std::map<std::string, any_abstract*> t_function_results;
-  typedef std::map<std::string, std::map<std::string, any_abstract*> > t_function_parameter_returns;
+  typedef std::map<std::string, std::map<std::string, any_abstract*> > t_function_results;
+  typedef std::map<std::string, std::map<std::string, std::map<std::string, any_abstract*> > > t_function_parameter_returns;
 
   stubber() :
     m_function_calls(t_function_call_list()),
@@ -171,21 +210,28 @@ class stubber {
   }
 
   template <class T>
-  void register_function_result(std::string const & function_name, T result) {
-    m_function_results[function_name] = (any_abstract*)new any<T>(result);
+  void register_function_result(std::string const & function_name, T result, condition const& cond = condition()) {
+    m_function_results[function_name][cond.value()] = (any_abstract*)new any<T>(result);
   }
 
   template <class T>
-  void register_function_parameter_return(std::string const & function_name, std::string const & parameter_name, T value) {
-    m_function_parameter_returns[function_name][parameter_name] = (any_abstract*)new any<T>(value);
+  void register_function_parameter_return(std::string const & function_name, std::string const & parameter_name, T value, condition const& cond = condition()) {
+
+    m_function_parameter_returns[function_name][cond.value()][parameter_name] = (any_abstract*)new any<T>(value);
   }
 
   template <class T>
-  T get_result(std::string const & function_name) {
+  T get_result(std::string const & function_name, condition const& cond = condition()) {
     T result;
     try {
-      any_abstract* something = m_function_results.at(function_name);
-      result = *(reinterpret_cast<T*>(something->get_value()));
+      auto function_values = m_function_results.at(function_name);
+      any_abstract* conditional_value;
+      try {
+        conditional_value = function_values.at(cond.value());
+      } catch (std::out_of_range const & e) {
+        conditional_value = function_values.at(condition().value());
+      }
+      result = *(reinterpret_cast<T*>(conditional_value->get_value()));
     } catch (std::out_of_range const & e) {
       throw std::runtime_error("No result defined for '" + function_name + "(..)'");
     }
@@ -193,11 +239,18 @@ class stubber {
   }
 
   template <class T>
-  T get_function_parameter_return(std::string const & function_name, std::string const & parameter_name) {
+  T get_function_parameter_return(std::string const & function_name, std::string const & parameter_name, condition const& cond = condition()) {
     T result;
     try {
-      auto parameters = m_function_parameter_returns.at(function_name);
-      auto value = parameters.at(parameter_name);
+      auto function_values = m_function_parameter_returns.at(function_name);
+      any_abstract* value;
+      try {
+        auto parameters = function_values.at(cond.value());
+        value = parameters.at(parameter_name);
+      } catch (std::out_of_range const& e) {
+        auto parameters = function_values.at(condition().value());
+        value = parameters.at(parameter_name);
+      }
       result = *(reinterpret_cast<T*>(value->get_value()));
     } catch (std::out_of_range const & e) {
       throw std::runtime_error("No result defined for '" + function_name + "(..)', parameter: '" + parameter_name + "'");
